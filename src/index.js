@@ -1,5 +1,19 @@
-function test() {
-    console.log('Application GAME 1');
+//import * as pixi from 'pixijs';
+import { Game } from './game/game';
+
+/*async function init() {
+    const app = new pixi.Application({ width: window.innerWidth, height: window.innerHeight });
+    //await app.init?.({ background: '#000', resizeTo: window });
+    document.body.appendChild(app.view);
+    window.onresize = () => {
+        //app.renderer.view.style.width = window.innerWidth;
+        //app.renderer.view.style.height = window.innerHeight;
+        app.renderer.resize(window.innerWidth, window.innerHeight)
+    }
 }
 
-test();
+init();*/
+
+const game = new Game();
+
+game.start();
