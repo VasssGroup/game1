@@ -1,39 +1,20 @@
-//import { Container } from 'pixijs';
 import { Engine } from './engine';
 
 export class Game {
     #colors = [ 0xFFFFFF, 0xFFDDDD, 0xDDFFDD, 0xFFFFDD ];
     #starLimit = 100;
     #starLayers = 3;
-    #layerSpeed = [ 2, 1, 0.5 ];
+    #layerSpeed = [ 1, 0.5, 0.25 ];
+    #layerAlpha = [ 1, 0.7, 0.5 ];
     #background = '#000';
 
     #randomInt = (int) => Math.floor(Math.random() * int);
 
-    #genStar = () => {
-        return  {
-            x: this.#randomInt(window.innerWidth-1),
-            y: this.#randomInt(window.innerHeight-1),
-            color: this.#colors[this.#randomInt(this.#colors.length)]
-        };       
-        /*const star = {
-            x: this.#randomInt(window.innerWidth-1),
-            y: this.#randomInt(window.innerHeight-1),
-            color: this.#colors[this.#randomInt(this.#colors.length)]
-        };
-
-        const gStar = this.e.createStar(star.x, star.y, star.color);
-        const gStar2 = this.e.createStar(star.x, star.y, star.color);
-        const gStar = new Graphics();
-        gStar.beginFill(star.color);
-        gStar.drawRect(star.x, star.y, 1, 1);
-        
-        const gStar2 = new Graphics();
-        gStar2.beginFill(star.color);
-        gStar2.drawRect(star.x + window.innerWidth, star.y, 1, 1);
-
-        return { star, gStar, gStar2 };*/
-    }
+    #genStar = () => ({
+        x: this.#randomInt(window.innerWidth-1),
+        y: this.#randomInt(window.innerHeight-1),
+        color: this.#colors[this.#randomInt(this.#colors.length)]
+    })
 
     #genLayerStars = () => {
         const layer = [];
@@ -56,7 +37,7 @@ export class Game {
 
     goStars() {
         const starsLayers = this.#createStarLayers();
-        const starsStage = this.e.createStarsStage(starsLayers);
+        const starsStage = this.e.createStarsStage(starsLayers, this.#layerAlpha);
         this.e.addToStage(starsStage);
         //console.log('starsStage ::', { starsStage, children: starsStage.children, engine: this.e });
 
@@ -77,13 +58,18 @@ export class Game {
         });        
     }
 
-    start() {
-        if (this.e.init) {
-            console.log('START GAME !!');
-            this.goStars();
-        } else {
-            console.log('GAME NOT INITIALISATION');
+    waitEngineInit = async () => {
+        while (!this.e.init) {
+            await (new Promise(resolve => setTimeout(resolve, 50)));
+            console.log('Engine NOT INITIALISATION !!');
         }
+    }
+
+    start = async () => {
+        await this.waitEngineInit();
+        console.log('Engine INITIALISATION...');
+        this.goStars();
+
     }
 
     constructor(props) {
@@ -91,7 +77,7 @@ export class Game {
             width: window.innerWidth,
             height: window.innerHeight,
             background: this.#background,
-            resizeTo: window
+            hasResize: true
         });
     }
 }

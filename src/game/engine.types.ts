@@ -4,6 +4,7 @@ export type PropsEngine = {
     width?: number;
     height?: number;
     background?: string;
+    hasResize?: boolean;
     resizeTo?: Window | HTMLElement;
 };
 
@@ -29,3 +30,6 @@ export type StarsLayer = {
 }[];
 
 export type StarsLayers = StarsLayer[];
+
+export { Container, Ticker };
+export type { IRenderer, ICanvas };
