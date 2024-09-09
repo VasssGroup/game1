@@ -1,6 +1,8 @@
-import { Container, Ticker, IRenderer, ICanvas } from 'pixijs';
+import { Container, Ticker, IRenderer, ICanvas, Texture } from 'pixijs';
 
 export type AssetsList = string[][];
+
+export type TexturesList = Record<string, Texture>;
 
 export type PropsEngine = {
     width?: number;
@@ -24,6 +26,10 @@ export interface IEngine {
     stage: Container;
     ticker: Ticker;
     renderer: IRenderer<ICanvas>;
+    textures: TexturesList;
+    texturesRady: boolean;
+    initialize: (hasResize?: boolean) => Promise<void>;
+    clearCanvas?: (background: number) => void;
 };
 
 export type StarsLayer = {
@@ -34,5 +40,5 @@ export type StarsLayer = {
 
 export type StarsLayers = StarsLayer[];
 
-export { Container, Ticker };
+export { Container, Ticker, Texture };
 export type { IRenderer, ICanvas };

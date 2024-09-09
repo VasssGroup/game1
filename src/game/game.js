@@ -1,9 +1,8 @@
-import { Engine } from './engine';
-import { orientations } from './engines.const';
+import { Engine, orientations, textureNames } from './engine';
 
 export class Game {
-    #colors = [ 0xFFFFFF, 0xFFDDDD, 0xDDFFDD, 0xFFFFDD ];
-    #starLimit = 100;
+    #starColors = [ 0xFFFFFF, 0xFFDDDD, 0xDDDDFF, 0xFFFFDD ];
+    #starLimit = 200;
     #starLayers = 5;
     #layerSpeed = [ 5, 4, 3, 2, 1 ];
     #layerAlpha = [ 1, 0.8, 0.6, 0.5, 0.4 ];
@@ -11,16 +10,32 @@ export class Game {
     #playerStepMoving = 5;
     #playerMoveX = 0;
     #playerMoveY = 0;
+    #playerFire = 0;
+    #playerAltFire = 0;
     #assetsList = [
-        ['spaceShip', './spacecraft.svg']        
-    ]
+        [ textureNames.spaceShip, './textures/spacecraft.svg'],
+        [ textureNames.spaceAirCraft, './textures/spaceaircraft.svg'],
+        [ textureNames.shotRed, './textures/blasterRed.png'],
+        [ textureNames.shotOrange, './textures/blasterOrange.png'],
+        [ textureNames.shotYellow, './textures/blasterYellow.png']
+    ];
+    #shotSpeed = 20;
+    #dellayFireTime = 300;
+    fireTime = (new Date).getTime();
+    #enemys = {
+        count: 5        
+    };
+    
 
     #randomInt = (int) => Math.floor(Math.random() * int);
+
+    #setEnemysStage = (enemysStage) => this.#enemys['enemysStage'] = enemysStage;
+    #getEnemysStage = () => this.#enemys.enemysStage;
 
     #genStar = () => ({
         x: this.#randomInt(window.innerWidth-1),
         y: this.#randomInt(window.innerHeight-1),
-        color: this.#colors[this.#randomInt(this.#colors.length)]
+        color: this.#starColors[this.#randomInt(this.#starColors.length)]
     })
 
     #genLayerStars = () => {
@@ -64,6 +79,7 @@ export class Game {
             case 38: this.#playerMoveY = 1; break; //Up
             case 39: this.#playerMoveX = 2; break; //Right
             case 40: this.#playerMoveY = 2; break; //Down
+            case 87: this.#playerFire = 1; break //w
             default: break;
         }  
         //console.log('keyDown ::', { event });
@@ -75,6 +91,7 @@ export class Game {
             case 38: this.#playerMoveY = 0; break; //Up
             case 39: this.#playerMoveX = 0; break; //Right
             case 40: this.#playerMoveY = 0; break; //Down
+            case 87: this.#playerFire = 0; break //w
             default: break;
         } 
         //console.log('keyUp ::', { event });
@@ -85,7 +102,10 @@ export class Game {
         window.addEventListener('keyup', this.#keyUp);
     }
 
-    #tickerPlayer = (playerShip) => () => {
+    #tickerPlayer = (playerStage, shotsStage) => () => {
+        const [ playerShip ] =  playerStage.children;
+        //console.log('playerStage:', { playerStage, playerShip });
+
         let newX = playerShip.x;
         let newY = playerShip.y;
         switch (this.#playerMoveX) {
@@ -113,24 +133,65 @@ export class Game {
         if (newX !== playerShip.x || newY !== playerShip.y) {
             playerShip.position.set(newX, newY);
         }
+
+        const delShots = [];
+
+        shotsStage.children.forEach((shot) => {
+            if (shot.x < window.innerWidth + shot.width) {
+                shot.position.set(shot.x + this.#shotSpeed, shot.y);
+            } else {
+                delShots.push(shot);
+            }
+        });
+        delShots.forEach(shot => shotsStage.removeChild(shot));
+
+        const time = (new Date()).getTime();
+        if (this.#playerFire === 1 && this.#dellayFireTime <= time - this.fireTime) {
+            this.fireTime = time;
+            const shotRed = this.e.createShot(textureNames.shotRed);
+            shotRed.position.set(playerShip.x + 10, playerShip.y + Math.floor(playerShip.height / 2) - Math.floor(shotRed.height / 2));
+            shotsStage.addChild(shotRed);            
+        }
+        this.e.addToStage(playerStage);
+        this.e.addToStage(shotsStage);
     }
 
     goStars() {
         const starsLayers = this.#createStarLayers();
         const starsStage = this.e.createStarsStage(starsLayers, this.#layerAlpha);
         this.e.addToStage(starsStage);
-        //console.log('starsStage ::', { starsStage, children: starsStage.children, engine: this.e });
 
         this.e.addTicker(this.#tickerStars(starsStage));        
     }
 
-    goPlayer = async () => {
+    goPlayer = () => {
         this.#addEventListeners();        
-        let playerShip = await this.e.createSpaceShip(orientations.right);
+        const playerShip = this.e.createSpaceShip(orientations.right, textureNames.spaceShip);
         playerShip.position.set(120, Math.floor(window.innerHeight / 2));
-        this.e.addToStage(playerShip);
+        const playerStage = this.e.createPlayerStage(playerShip);
+        const shotsStage = this.e.createShotsStage();
 
-        this.e.addTicker(this.#tickerPlayer(playerShip));
+        this.e.addToStage(playerStage);
+        this.e.addToStage(shotsStage);
+
+        this.e.addTicker(this.#tickerPlayer(playerStage, shotsStage));
+    }
+
+    goEnemys = () => {
+        const enemyShips = [];
+        for (let i = 0; i < this.#enemys.count; i++) {
+            const enemyShip = this.e.createSpaceShip(orientations.left, textureNames.spaceAirCraft);
+            let newRandomY = this.#randomInt(Math.floor(window.innerHeight/enemyShip.height)) * enemyShip.height;
+            while ( enemyShips.find((ship) => ship.y === newRandomY) ) {
+                newRandomY = this.#randomInt(Math.floor(window.innerHeight/enemyShip.height)) * enemyShip.height;
+            }
+            enemyShip.position.set(window.innerWidth - enemyShip.width, newRandomY);
+            enemyShips.push(enemyShip);
+        }
+
+        this.#setEnemysStage(this.e.createEnemyStage(enemyShips));
+        this.e.addToStage(this.#getEnemysStage());
+
     }
 
     #waitEngineInit = async () => {
@@ -155,9 +216,11 @@ export class Game {
         console.log('Stars complite...');
         //
         await this.#waitTexturesReady();        
-        await this.goPlayer();
+        this.goPlayer();
         console.log('Player complite...');
         //
+        this.goEnemys();
+        console.log('Enemys complite...');
     }
 
     constructor(props) {

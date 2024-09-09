@@ -1,16 +1,15 @@
-import { Graphics, autoDetectRenderer, TickerCallback, Assets, Sprite, Texture } from 'pixijs';
-//import { assets } from '../assets/assets';
-import { IEngine, PropsEngine, PropsStar, StarsLayers, StarsLayer, Container, Ticker, IRenderer, ICanvas, AssetsList } from './engine.types'; 
-import { orientations } from './engines.const';
+import { Graphics, autoDetectRenderer, TickerCallback, Assets, Sprite } from 'pixijs';
+import { IEngine, PropsEngine, PropsStar, StarsLayers, StarsLayer, Container, Ticker, IRenderer, ICanvas, AssetsList, TexturesList } from './engine.types'; 
+import { orientations, textureNames } from './engines.const';
 
 
 export class Engine implements IEngine {
     stage: Container;
     ticker: Ticker;
     renderer: IRenderer<ICanvas>;
-    init = false;
-    textures: Record<string, Texture> = {};
-    texturesRady = false;
+    init: boolean;
+    textures: TexturesList;
+    texturesRady: boolean;
 
     clearCanvas(background = 0x000000) {
         const rectClear = new Graphics();
@@ -59,9 +58,9 @@ export class Engine implements IEngine {
         return starsStage;
     }
 
-    createSpaceShip = async (orientation: orientations, x: number = 0, y: number = 0, size: number = 60) => {
+    createSpaceShip = (orientation: orientations, name: string = textureNames.spaceShip, x: number = 0, y: number = 0, size: number = 60) => {
         if (!this.texturesRady) return;     
-        const spriteShip = new Sprite(this.textures.spaceShip);
+        const spriteShip = new Sprite(this.textures[name]);
         spriteShip.x = x;
         spriteShip.y = y;
         spriteShip.width = size;
@@ -69,6 +68,47 @@ export class Engine implements IEngine {
         spriteShip.angle = orientation === orientations.right ? 90 : -90;
 
         return spriteShip;
+    }
+
+    createShot = (textureName: string = textureNames.shotRed) => {
+        if (!this.texturesRady) return;     
+        const shot = new Sprite(this.textures[textureName]);
+        shot.x = 0;
+        shot.y = 0;
+        shot.width = 40;
+        shot.height = 20;
+
+        return shot;
+    }
+
+    createPlayerStage = (spriteShip: Sprite) => {
+        const playerStage = new Container();
+        playerStage.position.set(0, 0);
+        playerStage.width = this.renderer.view.width;
+        playerStage.height = this.renderer.view.height;
+        playerStage.addChild(spriteShip);
+
+        return playerStage;
+    }
+
+    createShotsStage = (shots?: Sprite[]) => {
+        const shotsStage = new Container();
+        shotsStage.position.set(0, 0);
+        shotsStage.width = this.renderer.view.width;
+        shotsStage.height = this.renderer.view.height;
+        shots?.forEach?.(shot => shotsStage.addChild(shot));
+        
+        return shotsStage;
+    }
+
+    createEnemyStage = (enemyShips?: Sprite[]) => {
+        const enemyStage = new Container();
+        enemyStage.position.set(0, 0);
+        enemyStage.width = this.renderer.view.width;
+        enemyStage.height = this.renderer.view.height;
+        enemyShips?.forEach?.(enemyShip => enemyStage.addChild(enemyShip));
+
+        return enemyStage;
     }
 
     addToStage = (item: Container | Graphics) => this.stage.addChild(item);
@@ -87,7 +127,10 @@ export class Engine implements IEngine {
         }
     }
 
-    constructor({ width, height, background, hasResize, assetsList }: PropsEngine) {        
+    constructor({ width, height, background, hasResize, assetsList }: PropsEngine) {   
+        this.init = false;   
+        this.texturesRady = false;
+        this.textures = {};
         this.stage = new Container();
         this.ticker = Ticker.shared;
         this.renderer = autoDetectRenderer({ width, height, background });
@@ -97,7 +140,6 @@ export class Engine implements IEngine {
             });
         }
         this.initialize(hasResize).then(() => {
-
             this.ticker.add(() => this.renderer.render(this.stage));
             this.init = true;
         });  
