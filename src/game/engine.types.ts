@@ -1,11 +1,14 @@
 import { Container, Ticker, IRenderer, ICanvas } from 'pixijs';
 
+export type AssetsList = string[][];
+
 export type PropsEngine = {
     width?: number;
     height?: number;
     background?: string;
     hasResize?: boolean;
     resizeTo?: Window | HTMLElement;
+    assetsList?: AssetsList;
 };
 
 export type PropsStar = {
@@ -14,14 +17,14 @@ export type PropsStar = {
     color?: number;
     alpha?: number;
     size?: number;
-}
+};
 
 export interface IEngine {
     init: boolean;
     stage: Container;
     ticker: Ticker;
     renderer: IRenderer<ICanvas>;
-}
+};
 
 export type StarsLayer = {
     x: number;

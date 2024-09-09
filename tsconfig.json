@@ -17,5 +17,6 @@
       "compilerOptions": {
         "module": "commonjs"
       }
-    }
+    },
+    "include": ["src", "src/custom.d.ts"]
   }

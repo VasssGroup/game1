@@ -4,7 +4,8 @@
   "description": "Game o1",
   "main": "index.js",
   "scripts": {
-    "build": "node ./config/esbuild.js"
+    "build": "node ./config/esbuild-prod.js",
+    "start": "node ./config/esbuild-dev.js"
   },
   "author": "vasss",
   "license": "ISC",

@@ -1,11 +1,16 @@
-import { Graphics, autoDetectRenderer, TickerCallback } from 'pixijs';
-import { IEngine, PropsEngine, PropsStar, StarsLayers, StarsLayer, Container, Ticker, IRenderer, ICanvas } from './engine.types'; 
+import { Graphics, autoDetectRenderer, TickerCallback, Assets, Sprite, Texture } from 'pixijs';
+//import { assets } from '../assets/assets';
+import { IEngine, PropsEngine, PropsStar, StarsLayers, StarsLayer, Container, Ticker, IRenderer, ICanvas, AssetsList } from './engine.types'; 
+import { orientations } from './engines.const';
+
 
 export class Engine implements IEngine {
     stage: Container;
     ticker: Ticker;
     renderer: IRenderer<ICanvas>;
     init = false;
+    textures: Record<string, Texture> = {};
+    texturesRady = false;
 
     clearCanvas(background = 0x000000) {
         const rectClear = new Graphics();
@@ -54,21 +59,45 @@ export class Engine implements IEngine {
         return starsStage;
     }
 
+    createSpaceShip = async (orientation: orientations, x: number = 0, y: number = 0, size: number = 60) => {
+        if (!this.texturesRady) return;     
+        const spriteShip = new Sprite(this.textures.spaceShip);
+        spriteShip.x = x;
+        spriteShip.y = y;
+        spriteShip.width = size;
+        spriteShip.height = size;
+        spriteShip.angle = orientation === orientations.right ? 90 : -90;
+
+        return spriteShip;
+    }
+
     addToStage = (item: Container | Graphics) => this.stage.addChild(item);
-    addTicker = (ticker: TickerCallback<any>) => this.ticker.add(ticker);
+    addTicker = (ticker: TickerCallback<ICanvas>) => this.ticker.add(ticker);
+    loadAssets = async (assets: AssetsList) => {
+        await assets.forEach(async ([ name, url ]) => {
+            Assets.add(name, url);
+            this.textures[name] = await Assets.load(name);
+        });
+    }
 
     initialize = async (hasResize?: boolean) => {
-        await document.body.appendChild(this.renderer.view as any);
+        await document.body.appendChild(this.renderer.view as HTMLCanvasElement);
         if (hasResize) {
             document.body.onresize = () => this.renderer.resize(window.innerWidth, window.innerHeight);
         }
     }
 
-    constructor({ width, height, background, hasResize }: PropsEngine) {        
+    constructor({ width, height, background, hasResize, assetsList }: PropsEngine) {        
         this.stage = new Container();
         this.ticker = Ticker.shared;
         this.renderer = autoDetectRenderer({ width, height, background });
+        if (assetsList) {
+            this.loadAssets(assetsList).then(() => {
+                this.texturesRady = true;
+            });
+        }
         this.initialize(hasResize).then(() => {
+
             this.ticker.add(() => this.renderer.render(this.stage));
             this.init = true;
         });  
