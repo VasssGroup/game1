@@ -12,19 +12,25 @@ export class Game {
         },
         player: {
             stepMoving: 5,
+            lives: 1,
+            fullHealth: 100,            
             moveX: 0,
             moveY: 0,
             fire: 0,
-            altFire: 0,
+            altFire: 0,            
             shot: {
                 speed: 20,
                 delay: 100,
                 lastShotTime: 0
             }
         },
-        enemys: {
-            count: 9,
-            stepMoving: 3        
+        enemies: {
+            count: 3,
+            costPoint: 5,
+            costPointShot: 1,
+            costDamageShot: 5,
+            stepMoving: 3,
+            shotDelay: 1200        
         }
     }
     #background =  0x000000;
@@ -38,14 +44,14 @@ export class Game {
 
     #waitEngineInit = async () => {
         while (!this.e.init) {
-            await (new Promise(resolve => setTimeout(resolve, 50)));
+            await this.e.wait();
             //console.log('Engine NOT INITIALISATION !!');
         }
     }
 
     #waitTexturesReady = async () => {
         while (!this.e.texturesRady) {
-            await (new Promise(resolve => setTimeout(resolve, 50)));
+            await this.e.wait();
             //console.log('Textures NOT READY !!');
         }
     }
@@ -61,8 +67,8 @@ export class Game {
         this.e.player.go();
         console.log('Player complite...');
         //
-        this.e.enemys.go();
-        console.log('Enemys complite...');
+        this.e.enemies.go();
+        console.log('Enemies complite...');
     }
 
     constructor(props) {

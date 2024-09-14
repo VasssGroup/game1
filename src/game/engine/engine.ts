@@ -1,4 +1,4 @@
-import { autoDetectRenderer, Assets } from 'pixijs';
+import { autoDetectRenderer, Assets, Text } from 'pixijs';
 import { 
     IEngine, PropsEngine, PropsStar, StarsLayers, StarsLayer, TickerCallback,
     Container, Ticker, IRenderer, ICanvas, AssetsList, orientations, Sprite,
@@ -8,12 +8,15 @@ import { textureNames } from './engines.const';
 
 
 export class Engine implements IEngine {
+    renderStage: Container;
     stage: Container;
+    dialogStage: Container;
     ticker: Ticker;
     renderer: IRenderer<ICanvas>;
     init: boolean;
     textures: TexturesList;
     texturesRady: boolean;
+    gameOver: boolean;
 
     stars: StarsTools = {        
         config: {
@@ -102,6 +105,8 @@ export class Engine implements IEngine {
     player: PlayerTools = {
         config: {
             stepMoving: 5,
+            lives: 1,
+            fullHealth: 100,
             moveX: 0,
             moveY: 0,
             fire: 0,
@@ -115,6 +120,46 @@ export class Engine implements IEngine {
         shotStage: new Container(),
         stage: new Container(),
         interfaceStage: new Container(),
+        points: 0,
+        reserveLives: 0,
+        health: 0,
+        gameOver: async () => {
+            this.gameOver = true;
+            this.stage.removeChild(this.enemies.stage);
+            this.stage.removeChild(this.enemies.shotStage);
+            this.enemies.stage = new Container();
+            this.enemies.shotStage = new Container();
+            this.enemies.stage.width = this.cWidth();
+            this.enemies.stage.height = this.cHeight();
+            this.enemies.shotStage.width = this.cWidth();
+            this.enemies.shotStage.height = this.cHeight();
+            this.stage.addChild(this.enemies.shotStage);
+            this.stage.addChild(this.enemies.stage);
+            alert('Game Over!');
+            //await this.waitGameStart();
+            this.player.reloadLives();
+        },
+        reloadLives: (lives = this.player.config.lives) => {
+            this.player.reserveLives = lives;
+            this.player.startLive();
+            this.gameOver = false;
+        },
+        startLive: ()=> {
+            if (this.player.reserveLives <= 0) {
+                return this.player.gameOver(); //Game Over !!!!!
+            }
+            this.player.reserveLives = this.player.reserveLives - 1;
+            this.player.health = this.player.config.fullHealth;
+            //freezy time
+        },
+        damage: (damage) => {
+            this.player.health = this.player.health - damage;
+            if (this.player.health <= 0) {
+                this.player.startLive();
+            }
+        },
+        upPoints: points => this.player.points = this.player.points + points,
+        downPoints: points => this.player.points = this.player.points - points,
         keyUp: (e) => {
             //console.log('keyUp [e]:', { e });
             switch (this.getKeyCode(e)) {            
@@ -175,7 +220,33 @@ export class Engine implements IEngine {
 
             return shot;
         },
+        printInterface: () => {
+            const pointsText = `Points: ${this.player.points}`;
+            const healthText = `health: ${this.player.health}`;
+            const livesText = `L: ${this.player.reserveLives}`;
+            if (this.player.interfaceStage.children.length) {
+                const [ points, health, lives] = this.player.interfaceStage.children as Text[];
+                points.text = pointsText;
+                health.text = healthText;
+                lives.text = livesText;
+
+            } else {
+                const points = new Text(pointsText, { fontSize: 24, fill: 0xFFFF00 });
+                points.position.set(10, 10);
+
+                const health = new Text(healthText, { fontSize: 36, fill: 0xFFFF00 });
+                health.position.set(10, this.renderer.view.height - 46);
+
+                const lives = new Text(livesText, { fontSize: 24, fill: 0xFFFF00 });
+                lives.position.set(310, this.renderer.view.height - 34);
+
+                this.player.interfaceStage.addChild(points);
+                this.player.interfaceStage.addChild(health);
+                this.player.interfaceStage.addChild(lives);
+            }
+        },
         ticker: () => {
+            if (this.gameOver) return;
             const [ playerShip ] =  this.player.stage.children as Sprite[];
             let newX = playerShip.x;
             let newY = playerShip.y;
@@ -205,11 +276,11 @@ export class Engine implements IEngine {
                 playerShip.position.set(newX, newY);
             }
             const delShots: Sprite[] = [];
-            const delEnemys: Sprite[] = [];
+            const delEnemies: Sprite[] = [];
             (this.player.shotStage.children as Sprite[]).forEach((shot) => {
                 if (shot.x < window.innerWidth + shot.width) {
                     shot.position.set(shot.x + this.player.config.shot.speed, shot.y);
-                    (this.enemys.stage.children as Sprite[])?.forEach?.( enemyShip => {
+                    (this.enemies.stage.children as Sprite[])?.forEach?.( enemyShip => {
                         if (this.intersectionR2R(shot, {
                             x: enemyShip.x,
                             y: enemyShip.y - enemyShip.height,
@@ -218,8 +289,9 @@ export class Engine implements IEngine {
                         })) {
                             //Поподание во врага
                             //уничтожить врага, на место eshipPos поместить взрыв 1000 мс
-                            delEnemys.push(enemyShip);
+                            delEnemies.push(enemyShip);
                             delShots.push(shot);
+                            this.player.upPoints(this.enemies.config.costPoint);
                         }
                     });
                     /*const shotPos = {
@@ -289,7 +361,7 @@ export class Engine implements IEngine {
                 }
             });
             delShots.forEach(shot => this.player.shotStage.removeChild(shot));
-            delEnemys.forEach(enemy => this.enemys.stage.removeChild(enemy));
+            delEnemies.forEach(enemy => this.enemies.stage.removeChild(enemy));
             const time = (new Date()).getTime();
             if (this.player.config.fire === 1 && this.player.config.shot.delay <= time - this.player.config.shot.lastShotTime) {
                 this.player.config.shot.lastShotTime = time;
@@ -297,8 +369,8 @@ export class Engine implements IEngine {
                 shotRed.position.set(playerShip.x + 10, playerShip.y + Math.floor(playerShip.height / 2) - Math.floor(shotRed.height / 2));
                 this.player.shotStage.addChild(shotRed);            
             }
-            this.addToStage(this.player.shotStage);
-            this.addToStage(this.player.stage);
+            //
+            this.player.printInterface();
         },
         go: () => {
             this.player.addEventListeners();
@@ -308,25 +380,33 @@ export class Engine implements IEngine {
             this.addToStage(this.player.stage);
             this.addToStage(this.player.interfaceStage);
             this.addTicker(this.player.ticker);
+            this.player.startLive();
+            this.player.printInterface();
         }
     };
 
-    enemys: EnemyTools = {
+    enemies: EnemyTools = {
         config: {
             count: 5,
-            stepMoving: 5
+            costPoint: 2,
+            costPointShot: 1,
+            costDamageShot: 1,
+            stepMoving: 5,
+            shotDelay: 300
         },
+        fireTimers: [],
         stage: new Container(),
-        shotStage:new Container(),
+        shotStage: new Container(),
         createEnemyShip: (x, y, size) => this.player.createSpaceShip(orientations.left, textureNames.spaceAirCraft, x, y, size),
-        respawnEnemys: () => {
-            const newEnemyCount = this.enemys.config.count - this.enemys.stage.children.length;
+        createEnemyShot: () => this.player.createShot(textureNames.shotOrange),
+        respawnEnemies: () => {
+            const newEnemyCount = this.enemies.config.count - this.enemies.stage.children.length;
             if (newEnemyCount <= 0) return;            
             for (let i = 0; i < newEnemyCount; i++) {
-                const enemyShip = this.enemys.createEnemyShip();
+                const enemyShip = this.enemies.createEnemyShip();
                 const newX = this.renderer.view.width - enemyShip.width;
                 let newY = this.randomInt(this.renderer.view.height - enemyShip.height);
-                while ((this.enemys.stage.children as Sprite[]).find(ship => this.intersectionR2R({
+                while ((this.enemies.stage.children as Sprite[]).find(ship => this.intersectionR2R({
                         x: ship.x,
                         y: ship.y - ship.height,
                         width: ship.width,
@@ -340,45 +420,90 @@ export class Engine implements IEngine {
                     newY = this.randomInt(this.renderer.view.height);
                 }
                 enemyShip.position.set(newX, newY + enemyShip.height);
-                this.enemys.stage.addChild(enemyShip);
+                this.enemies.stage.addChild(enemyShip);
             }
         },
         ticker: () => {
+            if (this.gameOver) return;
             const PlayerShip = this.player.stage.children[0] as Sprite;
             const PlayerCenterY = PlayerShip.y + Math.floor(PlayerShip.height / 2);
-            const delEnemys: Sprite[] = [];
-            (this.enemys.stage.children as Sprite[]).forEach((enemy, i) => {
+            const delEnemies: Sprite[] = [];
+            const delEnemyShots: Sprite[] = [];
+            (this.enemies.stage.children as Sprite[]).forEach((enemy, i) => {
                 if (enemy.x <= 0) {
-                    delEnemys.push(enemy);
+                    delEnemies.push(enemy);
                 } else {
-                    const shipTop = enemy.y - enemy.height;                                
+                    const shipTop = enemy.y - enemy.height;
+                    const shipCenterY = enemy.y - Math.floor(enemy.height / 2);    
+                    const hasFireLine = shipTop <= PlayerCenterY && enemy.y >= PlayerCenterY;
+                    const nowTime = new Date().getTime();
+                    let fireTimerIndex = this.enemies.fireTimers.findIndex(({index}) => index === i); 
+                    if (fireTimerIndex < 0) {
+                        this.enemies.fireTimers.push({
+                            index: i,
+                            timer: 0
+                        });
+                        fireTimerIndex = this.enemies.fireTimers.length - 1;
+                    }
+                    if (hasFireLine && this.enemies.config.shotDelay <= nowTime - this.enemies.fireTimers[fireTimerIndex].timer) {
+                        // Стрелять перед ходом
+                        const shot = this.enemies.createEnemyShot(); 
+                        shot.position.set(enemy.x + shot.width, shipCenterY - Math.floor(shot.height / 2));
+                        this.enemies.shotStage.addChild(shot);
+                        this.enemies.fireTimers[fireTimerIndex].timer = nowTime;
+                    }                  
                     let newY = enemy.y;
-                    let newX = enemy.x - this.enemys.config.stepMoving;
+                    let newX = enemy.x - this.enemies.config.stepMoving;
                     if (i % 3 === 0) {
                         newY = shipTop > PlayerCenterY 
-                        ? enemy.y - this.enemys.config.stepMoving 
+                        ? enemy.y - this.enemies.config.stepMoving 
                         : enemy.y < PlayerCenterY 
-                            ? enemy.y + this.enemys.config.stepMoving 
+                            ? enemy.y + this.enemies.config.stepMoving 
                             : enemy.y;
-                        newX = newX + Math.floor(this.enemys.config.stepMoving / 2);
+                        newX = newX + Math.floor(this.enemies.config.stepMoving / 2);
                     }
 
-                    //let newX = newY === enemy.y ? enemy.x - this.enemys.config.stepMoving : enemy.x;                    
+                    //let newX = newY === enemy.y ? enemy.x - this.enemies.config.stepMoving : enemy.x;                    
 
                     enemy.position.set(newX, newY);
                 }
             });
-            delEnemys.forEach(enemy => this.enemys.stage.removeChild(enemy));
+            delEnemies.forEach(enemy => this.enemies.stage.removeChild(enemy));
             //
-            this.enemys.respawnEnemys();
+            (this.enemies.shotStage.children as Sprite[]).forEach(shot => {
+                const crashShot = (this.player.shotStage.children as Sprite[]).find(shotPlayer => this.intersectionR2R(shot, shotPlayer));
+                if (this.intersectionR2R({
+                    x: PlayerShip.x - PlayerShip.width,
+                    y: PlayerShip.y,
+                    width: PlayerShip.width,
+                    height: PlayerShip.height
+                }, shot)) {
+                    // попадание в игрока
+                    // уменьшать здоровье
+                    this.player.damage(this.enemies.config.costDamageShot);
+                    this.player.downPoints(this.enemies.config.costPointShot);
+                    delEnemyShots.push(shot);
+                } else if (crashShot) {
+                    this.player.shotStage.removeChild(crashShot);
+                    this.player.upPoints(this.enemies.config.costPointShot);
+                    delEnemyShots.push(shot);
+                } else if (shot.x + shot.width > 0) {                    
+                    shot.position.set(shot.x - this.player.config.shot.speed, shot.y);                    
+                } else {
+                    delEnemyShots.push(shot);
+                }
+            });
+            delEnemyShots.forEach(shot => this.enemies.shotStage.removeChild(shot));
+            //
+            this.enemies.respawnEnemies();
             //
         },
         go: () => {
-            this.enemys.respawnEnemys();
+            this.enemies.respawnEnemies();
 
-            this.addToStage(this.enemys.shotStage);
-            this.addToStage(this.enemys.stage);
-            this.addTicker(this.enemys.ticker);
+            this.addToStage(this.enemies.shotStage);
+            this.addToStage(this.enemies.stage);
+            this.addTicker(this.enemies.ticker);
         }
     };
 
@@ -412,7 +537,6 @@ export class Engine implements IEngine {
 
         return false;
     }
-
     getKeyCode = (e: KeyboardEvent) => {
         let key = 0;
         switch (e.key) {
@@ -427,7 +551,6 @@ export class Engine implements IEngine {
 
         return key;
     }
-
     clearCanvas(background = 0x000000) {
         const rectClear = new Graphics();
         rectClear.beginFill(background);
@@ -436,41 +559,13 @@ export class Engine implements IEngine {
         
         this.stage.addChild(rectClear);
     }
+    cWidth = () => this.renderer.view.width;
+    cHeight = () => this.renderer.view.height;
 
-    createShotsStage = (shots?: Sprite[]) => {
-        const shotsStage = new Container();
-        shotsStage.position.set(0, 0);
-        shotsStage.width = this.renderer.view.width;
-        shotsStage.height = this.renderer.view.height;
-        shots?.forEach?.(shot => shotsStage.addChild(shot));
-        
-        return shotsStage;
-    }
-
-    createEnemyStage = (enemyShips?: Sprite[]) => {
-        const enemyStage = new Container();
-        const shipsState = new Container();
-        const shotsState = this.createShotsStage();
-
-        shipsState.position.set(0, 0);
-        shipsState.width = this.renderer.view.width;
-        shipsState.height = this.renderer.view.height;
-
-        shotsState.position.set(0, 0);
-        shotsState.width = this.renderer.view.width;
-        shotsState.height = this.renderer.view.height;        
-
-        enemyStage.position.set(0, 0);
-        enemyStage.width = this.renderer.view.width;
-        enemyStage.height = this.renderer.view.height;
-         
-        enemyShips?.forEach?.(enemyShip => shipsState.addChild(enemyShip));
-
-        enemyStage.addChild(shipsState);
-        enemyStage.addChild(shotsState);
-
-        return enemyStage;
-    }
+    wait = () => new Promise(resolve => setTimeout(resolve, 50));
+    waitGameStart = async () => {
+        while (this.gameOver) { await this.wait() }
+    };
 
     addToStage = (item: Container | Graphics) => this.stage.addChild(item);
     addTicker = (ticker: TickerCallback<ICanvas>) => this.ticker.add(ticker);
@@ -491,11 +586,15 @@ export class Engine implements IEngine {
     constructor({ width, height, background, hasResize, assetsList, cfgs }: PropsEngine) { 
         this.stars.config = cfgs.stars;
         this.player.config = cfgs.player;  
-        this.enemys.config = cfgs.enemys;  
+        this.enemies.config = cfgs.enemies;  
+        this.player.reserveLives = this.player.config.lives;
         this.init = false;   
         this.texturesRady = false;
+        this.gameOver = false;
         this.textures = {};
+        this.renderStage = new Container();
         this.stage = new Container();
+        this.dialogStage = new Container();
         this.ticker = Ticker.shared;
         this.renderer = autoDetectRenderer({ width, height, background });
         if (assetsList) {
@@ -504,7 +603,9 @@ export class Engine implements IEngine {
             });
         }
         this.initialize(hasResize).then(() => {
-            this.ticker.add(() => this.renderer.render(this.stage));
+            this.renderStage.addChild(this.stage);
+            this.renderStage.addChild(this.dialogStage);
+            this.ticker.add(() => this.renderer.render(this.renderStage));
             this.init = true;
         });  
     }

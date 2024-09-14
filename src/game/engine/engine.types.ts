@@ -36,6 +36,8 @@ export type ShotConfig = {
 
 export type PlayerConfig = {
     stepMoving: number;
+    lives: number;
+    fullHealth: number;
     moveX: number;
     moveY: number;
     fire: number;
@@ -48,27 +50,48 @@ export type PlayerTools = {
     shotStage: Container;
     stage: Container;
     interfaceStage: Container;
+    points: number;
+    reserveLives: number;
+    health: number;
+    gameOver: () => void;
+    reloadLives: (Lives?: number) => void;
+    startLive: () => void;
+    damage: (damage: number) => void;
+    upPoints: (points: number) => void;
+    downPoints: (points: number) => void;
     keyUp: (event: KeyboardEvent) => void;
     keyDown: (event: KeyboardEvent) => void;
     addEventListeners: () => void;
     createSpaceShip: (orientation: orientations, name?: string, x?: number, y?: number, size?: number) => Sprite;
     toStage: () => void;
     createShot: (textureName: string) => Sprite;
+    printInterface: () => void;
     ticker: TickerCallback<ICanvas>;
     go: () => void;
 }
 
 export type EnemyConfig = {
     count: number;
+    costPoint: number;
+    costPointShot: number;
+    costDamageShot: number;
     stepMoving: number;
+    shotDelay: number;
+}
+
+type FireTimer = {
+    index: number;
+    timer: number;
 }
 
 export type EnemyTools = {
     config: EnemyConfig;
+    fireTimers: FireTimer[];
     shotStage: Container;
     stage: Container;
     createEnemyShip: (x?: number, y?: number, size?: number) => Sprite;
-    respawnEnemys: () => void;
+    createEnemyShot: () => Sprite;
+    respawnEnemies: () => void;
     ticker: TickerCallback<ICanvas>;
     go: () => void;
 };
@@ -76,7 +99,7 @@ export type EnemyTools = {
 type Configs = {
     stars: StarsConfig;
     player: PlayerConfig;
-    enemys: EnemyConfig;
+    enemies: EnemyConfig;
 };
 
 export type PropsEngine = {
@@ -99,11 +122,14 @@ export type PropsStar = {
 
 export interface IEngine {
     init: boolean;
+    renderStage: Container;
     stage: Container;
+    dialogStage: Container;
     ticker: Ticker;
     renderer: IRenderer<ICanvas>;
     textures: TexturesList;
     texturesRady: boolean;
+    gameOver: boolean;
     stars: StarsTools;
     player: PlayerTools;
     initialize: (hasResize?: boolean) => Promise<void>;
