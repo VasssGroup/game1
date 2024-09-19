@@ -1,4 +1,4 @@
-import { Container, Ticker, IRenderer, ICanvas, Texture, Graphics, DisplayObject, TickerCallback, Sprite } from 'pixijs';
+import { Container, Ticker, IRenderer, ICanvas, Texture, Graphics, GraphicsGeometry, TickerCallback, Sprite, ITextStyle, TextStyle, Text } from 'pixijs';
 
 export type AssetsList = string[][];
 
@@ -50,9 +50,11 @@ export type PlayerTools = {
     shotStage: Container;
     stage: Container;
     interfaceStage: Container;
+    interfaceHeight: number;
     points: number;
     reserveLives: number;
     health: number;
+    wh: () => { width: number, height: number }
     gameOver: () => void;
     reloadLives: (Lives?: number) => void;
     startLive: () => void;
@@ -92,9 +94,17 @@ export type EnemyTools = {
     createEnemyShip: (x?: number, y?: number, size?: number) => Sprite;
     createEnemyShot: () => Sprite;
     respawnEnemies: () => void;
+    toStage: () => void;
     ticker: TickerCallback<ICanvas>;
     go: () => void;
 };
+
+export type CreateTools = {
+    stage: () => Container;
+    sprite: (texture?: Texture) => Sprite;
+    graphics: (geometry?: GraphicsGeometry) => Graphics;
+    text: (text?: string | number, style?: Partial<ITextStyle> | TextStyle, canvas?: ICanvas) => Text;
+}
 
 type Configs = {
     stars: StarsConfig;
@@ -129,9 +139,11 @@ export interface IEngine {
     renderer: IRenderer<ICanvas>;
     textures: TexturesList;
     texturesRady: boolean;
-    gameOver: boolean;
+    pauseGame: boolean;
+    create: CreateTools;
     stars: StarsTools;
     player: PlayerTools;
+    enemies: EnemyTools;
     initialize: (hasResize?: boolean) => Promise<void>;
     randomInt: (int: number) => number;
     clearCanvas?: (background: number) => void;

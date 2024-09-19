@@ -1,7 +1,7 @@
-import { autoDetectRenderer, Assets, Text } from 'pixijs';
+import { autoDetectRenderer, Assets, Text, GraphicsGeometry, ITextStyle, TextStyle } from 'pixijs';
 import { 
-    IEngine, PropsEngine, PropsStar, StarsLayers, StarsLayer, TickerCallback,
-    Container, Ticker, IRenderer, ICanvas, AssetsList, orientations, Sprite,
+    IEngine, PropsEngine, PropsStar, StarsLayers, StarsLayer, TickerCallback, Texture,
+    Container, Ticker, IRenderer, ICanvas, AssetsList, orientations, Sprite, CreateTools,
     TexturesList, StarsTools, PlayerTools, EnemyTools, Graphics, Rectangles 
 } from './engine.types'; 
 import { textureNames } from './engines.const';
@@ -16,7 +16,14 @@ export class Engine implements IEngine {
     init: boolean;
     textures: TexturesList;
     texturesRady: boolean;
-    gameOver: boolean;
+    pauseGame: boolean;
+
+    create: CreateTools = {
+        stage: () => new Container(),
+        sprite: (texture?: Texture) => new Sprite(texture),
+        graphics: (geometry?: GraphicsGeometry) => new Graphics(geometry),
+        text: (text?: string | number, style?: Partial<ITextStyle> | TextStyle, canvas?: ICanvas) => new Text(text, style, canvas)
+    };
 
     stars: StarsTools = {        
         config: {
@@ -50,7 +57,7 @@ export class Engine implements IEngine {
             return starsLayers;
         },
         createStar: ({ x = 0, y = 0, color = 0x00ff00, alpha = 1, size = 1 }: PropsStar) => {
-            const star = new Graphics();
+            const star = this.create.graphics();
             star.beginFill(color, alpha);
             star.drawRect(x, y, size, size);
             star.endFill();
@@ -58,7 +65,7 @@ export class Engine implements IEngine {
             return star;
         },
         createStarsLayer: (layer: StarsLayer, alpha?: number) => {
-            const starsLayer = new Container();
+            const starsLayer = this.create.stage();
             starsLayer.position.set(0, 0);
             starsLayer.width = this.renderer.view.width;
             starsLayer.height = this.renderer.view.height;
@@ -92,7 +99,6 @@ export class Engine implements IEngine {
                 layer.position.set(layer.x - speed, 0);
                 layerNext.position.set(layerNext.x - speed, 0);
             }
-            //this.addToStage(this.stars.stage);
         },
         go: () => {
             this.stars.createStarsStage(this.stars.genStarLayers(), this.stars.config.layerAlpha);
@@ -101,6 +107,10 @@ export class Engine implements IEngine {
             this.addTicker(this.stars.ticker);        
         }
     };
+
+    dialog: any = {
+
+    }
 
     player: PlayerTools = {
         config: {
@@ -120,29 +130,31 @@ export class Engine implements IEngine {
         shotStage: new Container(),
         stage: new Container(),
         interfaceStage: new Container(),
+        interfaceHeight: 50,
         points: 0,
         reserveLives: 0,
         health: 0,
+        wh: () => ({ width: this.cWidth(), height: this.cHeight() - this.player.interfaceHeight }),
         gameOver: async () => {
-            this.gameOver = true;
+            this.pause(true);
+            const { width, height } = this.player.wh();
             this.stage.removeChild(this.enemies.stage);
             this.stage.removeChild(this.enemies.shotStage);
-            this.enemies.stage = new Container();
-            this.enemies.shotStage = new Container();
-            this.enemies.stage.width = this.cWidth();
-            this.enemies.stage.height = this.cHeight();
-            this.enemies.shotStage.width = this.cWidth();
-            this.enemies.shotStage.height = this.cHeight();
+            this.enemies.stage = this.create.stage();
+            this.enemies.shotStage = this.create.stage();
+            this.enemies.stage.width = width;
+            this.enemies.stage.height = height;
+            this.enemies.shotStage.width = width;
+            this.enemies.shotStage.height = height;
             this.stage.addChild(this.enemies.shotStage);
             this.stage.addChild(this.enemies.stage);
             alert('Game Over!');
-            //await this.waitGameStart();
             this.player.reloadLives();
         },
         reloadLives: (lives = this.player.config.lives) => {
             this.player.reserveLives = lives;
             this.player.startLive();
-            this.gameOver = false;
+            this.pause(false);
         },
         startLive: ()=> {
             if (this.player.reserveLives <= 0) {
@@ -187,7 +199,7 @@ export class Engine implements IEngine {
             window.addEventListener('keyup', this.player.keyUp);
         },
         createSpaceShip: (orientation, name = textureNames.spaceShip, x = 0, y = 0, size = 60) => {
-            const spriteShip = new Sprite(this.textures[name]);
+            const spriteShip = this.create.sprite(this.textures[name]);
             spriteShip.x = x;
             spriteShip.y = y;
             spriteShip.width = size;
@@ -197,22 +209,23 @@ export class Engine implements IEngine {
             return spriteShip;
         },
         toStage: () => {
-            this.player.stage.position.set(0, 0);
-            this.player.stage.width = this.renderer.view.width;
-            this.player.stage.height = this.renderer.view.height;
+            const { width, height } = this.player.wh();
+            this.player.stage.position.set(0, this.player.interfaceHeight);
+            this.player.stage.width = width;
+            this.player.stage.height = height;
             const playerShip = this.player.createSpaceShip(orientations.right, textureNames.spaceShip);
-            playerShip.position.set(120, Math.floor(this.renderer.view.height / 2));
+            playerShip.position.set(120, Math.floor(height / 2));
             
             this.player.stage.addChild(playerShip); 
-            this.player.shotStage.position.set(0, 0); 
-            this.player.shotStage.width = this.renderer.view.width;
-            this.player.shotStage.height = this.renderer.view.height;  
+            this.player.shotStage.position.set(0, this.player.interfaceHeight); 
+            this.player.shotStage.width = width;
+            this.player.shotStage.height = height;  
             this.player.interfaceStage.position.set(0, 0); 
-            this.player.interfaceStage.width = this.renderer.view.width;
-            this.player.interfaceStage.height = this.renderer.view.height;            
+            this.player.interfaceStage.width = width;
+            this.player.interfaceStage.height = this.player.interfaceHeight;            
         },
         createShot: (textureName = textureNames.shotRed) => {
-            const shot = new Sprite(this.textures[textureName]);
+            const shot = this.create.sprite(this.textures[textureName]);
             shot.x = 0;
             shot.y = 0;
             shot.width = 40;
@@ -231,14 +244,14 @@ export class Engine implements IEngine {
                 lives.text = livesText;
 
             } else {
-                const points = new Text(pointsText, { fontSize: 24, fill: 0xFFFF00 });
-                points.position.set(10, 10);
+                const points = this.create.text(pointsText, { fontSize: 24, fill: 0xFFFF00 });
+                points.position.set(320, 15);
 
-                const health = new Text(healthText, { fontSize: 36, fill: 0xFFFF00 });
-                health.position.set(10, this.renderer.view.height - 46);
+                const health = this.create.text(healthText, { fontSize: 36, fill: 0xFFFF00 });
+                health.position.set(100, 10);
 
-                const lives = new Text(livesText, { fontSize: 24, fill: 0xFFFF00 });
-                lives.position.set(310, this.renderer.view.height - 34);
+                const lives = this.create.text(livesText, { fontSize: 24, fill: 0xFFFF00 });
+                lives.position.set(10, 15);
 
                 this.player.interfaceStage.addChild(points);
                 this.player.interfaceStage.addChild(health);
@@ -246,7 +259,8 @@ export class Engine implements IEngine {
             }
         },
         ticker: () => {
-            if (this.gameOver) return;
+            if (this.pauseGame) return;
+            const { width, height } = this.player.wh();
             const [ playerShip ] =  this.player.stage.children as Sprite[];
             let newX = playerShip.x;
             let newY = playerShip.y;
@@ -255,7 +269,7 @@ export class Engine implements IEngine {
                     if (newX > (playerShip.width + this.player.config.stepMoving)) newX = newX - this.player.config.stepMoving;
                     break;
                 case 2:
-                    if (newX < this.renderer.view.width - this.player.config.stepMoving) newX = newX + this.player.config.stepMoving;
+                    if (newX < width - this.player.config.stepMoving) newX = newX + this.player.config.stepMoving;
                     break;
                 case 0:
                 default:
@@ -266,7 +280,7 @@ export class Engine implements IEngine {
                     if (newY > this.player.config.stepMoving) newY = newY - this.player.config.stepMoving;
                     break;
                 case 2:
-                    if (newY < this.renderer.view.height - playerShip.height - this.player.config.stepMoving) newY = newY + this.player.config.stepMoving;
+                    if (newY < height - playerShip.height - this.player.config.stepMoving) newY = newY + this.player.config.stepMoving;
                     break;
                 case 0:
                 default:
@@ -394,18 +408,19 @@ export class Engine implements IEngine {
             stepMoving: 5,
             shotDelay: 300
         },
-        fireTimers: [],
         stage: new Container(),
         shotStage: new Container(),
+        fireTimers: [],
         createEnemyShip: (x, y, size) => this.player.createSpaceShip(orientations.left, textureNames.spaceAirCraft, x, y, size),
         createEnemyShot: () => this.player.createShot(textureNames.shotOrange),
         respawnEnemies: () => {
+            const { width, height } = this.player.wh();
             const newEnemyCount = this.enemies.config.count - this.enemies.stage.children.length;
             if (newEnemyCount <= 0) return;            
             for (let i = 0; i < newEnemyCount; i++) {
                 const enemyShip = this.enemies.createEnemyShip();
-                const newX = this.renderer.view.width - enemyShip.width;
-                let newY = this.randomInt(this.renderer.view.height - enemyShip.height);
+                const newX = width - enemyShip.width;
+                let newY = this.randomInt(height - enemyShip.height);
                 while ((this.enemies.stage.children as Sprite[]).find(ship => this.intersectionR2R({
                         x: ship.x,
                         y: ship.y - ship.height,
@@ -417,14 +432,23 @@ export class Engine implements IEngine {
                         width: enemyShip.width,
                         height: enemyShip.height
                     }))) {
-                    newY = this.randomInt(this.renderer.view.height);
+                    newY = this.randomInt(height - enemyShip.height);
                 }
                 enemyShip.position.set(newX, newY + enemyShip.height);
                 this.enemies.stage.addChild(enemyShip);
             }
         },
+        toStage: () => {
+            const { width, height } = this.player.wh();
+            this.enemies.shotStage.position.set(0, this.player.interfaceHeight);
+            this.enemies.shotStage.width = width;
+            this.enemies.shotStage.height = height;            
+            this.enemies.stage.position.set(0, this.player.interfaceHeight);
+            this.enemies.stage.width = width;
+            this.enemies.stage.height = height; 
+        },
         ticker: () => {
-            if (this.gameOver) return;
+            if (this.pauseGame) return;            
             const PlayerShip = this.player.stage.children[0] as Sprite;
             const PlayerCenterY = PlayerShip.y + Math.floor(PlayerShip.height / 2);
             const delEnemies: Sprite[] = [];
@@ -499,6 +523,7 @@ export class Engine implements IEngine {
             //
         },
         go: () => {
+            this.enemies.toStage();           
             this.enemies.respawnEnemies();
 
             this.addToStage(this.enemies.shotStage);
@@ -559,12 +584,19 @@ export class Engine implements IEngine {
         
         this.stage.addChild(rectClear);
     }
+    pause = (pause?: boolean) => {
+        if (pause === undefined) {
+            this.pauseGame = !this.pauseGame;
+        } else {
+            this.pauseGame = !!pause;
+        }
+    };
     cWidth = () => this.renderer.view.width;
     cHeight = () => this.renderer.view.height;
 
-    wait = () => new Promise(resolve => setTimeout(resolve, 50));
-    waitGameStart = async () => {
-        while (this.gameOver) { await this.wait() }
+    wait = (ms: number = 50) => new Promise(resolve => setTimeout(resolve, ms));
+    waitPause = async () => {
+        while (this.pauseGame) { await this.wait() }
     };
 
     addToStage = (item: Container | Graphics) => this.stage.addChild(item);
@@ -586,15 +618,17 @@ export class Engine implements IEngine {
     constructor({ width, height, background, hasResize, assetsList, cfgs }: PropsEngine) { 
         this.stars.config = cfgs.stars;
         this.player.config = cfgs.player;  
-        this.enemies.config = cfgs.enemies;  
         this.player.reserveLives = this.player.config.lives;
+        this.enemies.config = cfgs.enemies;          
+        this.enemies.stage = this.create.stage();
+        this.enemies.shotStage = this.create.stage();
         this.init = false;   
         this.texturesRady = false;
-        this.gameOver = false;
+        this.pauseGame = false;
         this.textures = {};
-        this.renderStage = new Container();
-        this.stage = new Container();
-        this.dialogStage = new Container();
+        this.renderStage = this.create.stage();
+        this.stage = this.create.stage();
+        this.dialogStage = this.create.stage();
         this.ticker = Ticker.shared;
         this.renderer = autoDetectRenderer({ width, height, background });
         if (assetsList) {
