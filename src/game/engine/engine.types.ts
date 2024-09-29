@@ -70,7 +70,16 @@ export type PlayerTools = {
     printInterface: () => void;
     ticker: TickerCallback<ICanvas>;
     go: () => void;
-}
+};
+
+type DialogParams = {};
+
+export type DialogTools = {
+    stage: Container;
+    show: (params: DialogParams) => void;
+    hide: () => void;
+    go: () => void;
+};
 
 export type EnemyConfig = {
     count: number;
@@ -79,19 +88,19 @@ export type EnemyConfig = {
     costDamageShot: number;
     stepMoving: number;
     shotDelay: number;
-}
+};
 
 type FireTimer = {
     index: number;
     timer: number;
-}
+};
 
 export type EnemyTools = {
     config: EnemyConfig;
     fireTimers: FireTimer[];
     shotStage: Container;
     stage: Container;
-    createEnemyShip: (x?: number, y?: number, size?: number) => Sprite;
+    createEnemyShip: (x?: number, y?: number, size?: number, orientation?: orientations, name?: string) => Sprite;
     createEnemyShot: () => Sprite;
     respawnEnemies: () => void;
     toStage: () => void;
@@ -104,7 +113,7 @@ export type CreateTools = {
     sprite: (texture?: Texture) => Sprite;
     graphics: (geometry?: GraphicsGeometry) => Graphics;
     text: (text?: string | number, style?: Partial<ITextStyle> | TextStyle, canvas?: ICanvas) => Text;
-}
+};
 
 type Configs = {
     stars: StarsConfig;
@@ -130,6 +139,24 @@ export type PropsStar = {
     size?: number;
 };
 
+export type HelpersTools = {
+    randomInt: (int: number) => number;
+    intersectionR2R: (_r1: Rectangles, _r2: Rectangles) => boolean;
+    getKeyCode: (e: KeyboardEvent) => number;
+    wait: (ms?: number) => Promise<unknown>;
+    pause: (pause?: boolean) => void;
+    waitPause: () => Promise<void>;
+    cWidth: () => number;
+    cHeight: () => number;
+};
+
+export type ExplosionsTools = {
+    stage: Container;
+    createExplosion: () => void;
+    ticker: TickerCallback<ICanvas>;
+    go: () => void;
+};
+
 export interface IEngine {
     init: boolean;
     renderStage: Container;
@@ -140,13 +167,15 @@ export interface IEngine {
     textures: TexturesList;
     texturesRady: boolean;
     pauseGame: boolean;
+    helpers: HelpersTools;
     create: CreateTools;
     stars: StarsTools;
+    dialog: DialogTools;
     player: PlayerTools;
     enemies: EnemyTools;
+    explosions: ExplosionsTools;
+    loadAssets: (assets?: AssetsList) => Promise<void>;
     initialize: (hasResize?: boolean) => Promise<void>;
-    randomInt: (int: number) => number;
-    clearCanvas?: (background: number) => void;
 };
 
 export type StarsLayer = {

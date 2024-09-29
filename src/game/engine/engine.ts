@@ -1,8 +1,8 @@
-import { autoDetectRenderer, Assets, Text, GraphicsGeometry, ITextStyle, TextStyle } from 'pixijs';
+import { autoDetectRenderer, Assets, Text } from 'pixijs';
 import { 
-    IEngine, PropsEngine, PropsStar, StarsLayers, StarsLayer, TickerCallback, Texture,
+    IEngine, PropsEngine, PropsStar, TickerCallback, HelpersTools, ExplosionsTools,
     Container, Ticker, IRenderer, ICanvas, AssetsList, orientations, Sprite, CreateTools,
-    TexturesList, StarsTools, PlayerTools, EnemyTools, Graphics, Rectangles 
+    TexturesList, StarsTools, PlayerTools, EnemyTools, Graphics, DialogTools 
 } from './engine.types'; 
 import { textureNames } from './engines.const';
 
@@ -18,11 +18,70 @@ export class Engine implements IEngine {
     texturesRady: boolean;
     pauseGame: boolean;
 
+    helpers: HelpersTools = {
+        randomInt: (int) => Math.floor(Math.random() * int),
+        intersectionR2R: (_r1, _r2) => {
+            const r1 = {
+                left: _r1.x,
+                top: _r1.y,
+                right: _r1.x + _r1.width,
+                bottom: _r1.y + _r1.height
+            };
+            const r2 = {
+                left: _r2.x,
+                top: _r2.y,
+                right: _r2.x + _r2.width,
+                bottom: _r2.y + _r2.height
+            };
+    
+            if (
+                (
+                    (r1.top <= r2.bottom && r1.top >= r2.top) || 
+                    (r1.bottom >= r2.top && r1.bottom <= r2.bottom)
+                ) &&
+                (
+                    (r1.right >= r2.left && r1.right <= r2.right) ||
+                    (r1.left <= r2.right && r1.left >= r2.left)
+                )
+            ) {
+                return true;
+            }
+    
+            return false;
+        },
+        getKeyCode: (e) => {
+            let key = 0;
+            switch (e.key) {
+                case "ArrowLeft": key = 37; break;
+                case "ArrowUp": key = 38; break;
+                case "ArrowRight": key = 39; break;
+                case "ArrowDown": key = 40; break;
+                case "w":
+                case "W": key = 87; break;
+                default: break;
+            }
+    
+            return key;
+        },
+        wait: (ms = 50) => new Promise(r => setTimeout(r, ms)),
+        pause: (pause) => {
+            if (pause === undefined) {
+                this.pauseGame = !this.pauseGame;
+            } else {
+                this.pauseGame = !!pause;
+            }
+        },
+        waitPause: async () => {
+            while (this.pauseGame) { await this.helpers.wait() }
+        },
+        cWidth: () => this.renderer.view.width,
+        cHeight: () => this.renderer.view.height,
+    }
     create: CreateTools = {
         stage: () => new Container(),
-        sprite: (texture?: Texture) => new Sprite(texture),
-        graphics: (geometry?: GraphicsGeometry) => new Graphics(geometry),
-        text: (text?: string | number, style?: Partial<ITextStyle> | TextStyle, canvas?: ICanvas) => new Text(text, style, canvas)
+        sprite: (texture) => new Sprite(texture),
+        graphics: (geometry) => new Graphics(geometry),
+        text: (text, style, canvas) => new Text(text, style, canvas)
     };
 
     stars: StarsTools = {        
@@ -36,9 +95,9 @@ export class Engine implements IEngine {
         },
         stage: new Container(),        
         genStar: () => ({
-            x: this.randomInt(this.renderer.view.width-1), 
-            y: this.randomInt(this.renderer.view.height-1), 
-            color: this.stars.config.colors[this.randomInt(this.stars.config.colors.length - 1)]
+            x: this.helpers.randomInt(this.renderer.view.width-1), 
+            y: this.helpers.randomInt(this.renderer.view.height-1), 
+            color: this.stars.config.colors[this.helpers.randomInt(this.stars.config.colors.length - 1)]
         }),
         genLayerStars: () => {
             const layer = [];
@@ -64,7 +123,7 @@ export class Engine implements IEngine {
     
             return star;
         },
-        createStarsLayer: (layer: StarsLayer, alpha?: number) => {
+        createStarsLayer: (layer, alpha) => {
             const starsLayer = this.create.stage();
             starsLayer.position.set(0, 0);
             starsLayer.width = this.renderer.view.width;
@@ -76,7 +135,7 @@ export class Engine implements IEngine {
     
             return starsLayer;
         },
-        createStarsStage: (starsLayers: StarsLayers, arAlpha?: number[]) => {             
+        createStarsStage: (starsLayers, arAlpha) => {             
             for (let i = 0; i < starsLayers.length; i++) {
                 const starsLayer = this.stars.createStarsLayer(starsLayers[i], arAlpha?.[i]);
                 this.stars.stage.addChild(starsLayer);
@@ -108,9 +167,18 @@ export class Engine implements IEngine {
         }
     };
 
-    dialog: any = {
-
-    }
+    dialog: DialogTools = {
+        stage: new Container(),
+        show: (params) => {
+            //
+        },
+        hide: () => {
+            //
+        },
+        go: () => {
+            this.addToStage(this.dialog.stage);
+        }
+    };
 
     player: PlayerTools = {
         config: {
@@ -134,9 +202,9 @@ export class Engine implements IEngine {
         points: 0,
         reserveLives: 0,
         health: 0,
-        wh: () => ({ width: this.cWidth(), height: this.cHeight() - this.player.interfaceHeight }),
+        wh: () => ({ width: this.helpers.cWidth(), height: this.helpers.cHeight() - this.player.interfaceHeight }),
         gameOver: async () => {
-            this.pause(true);
+            this.helpers.pause(true);
             const { width, height } = this.player.wh();
             this.stage.removeChild(this.enemies.stage);
             this.stage.removeChild(this.enemies.shotStage);
@@ -154,7 +222,7 @@ export class Engine implements IEngine {
         reloadLives: (lives = this.player.config.lives) => {
             this.player.reserveLives = lives;
             this.player.startLive();
-            this.pause(false);
+            this.helpers.pause(false);
         },
         startLive: ()=> {
             if (this.player.reserveLives <= 0) {
@@ -174,7 +242,7 @@ export class Engine implements IEngine {
         downPoints: points => this.player.points = this.player.points - points,
         keyUp: (e) => {
             //console.log('keyUp [e]:', { e });
-            switch (this.getKeyCode(e)) {            
+            switch (this.helpers.getKeyCode(e)) {            
                 case 37: this.player.config.moveX = 0; break; //Left
                 case 38: this.player.config.moveY = 0; break; //Up
                 case 39: this.player.config.moveX = 0; break; //Right
@@ -185,7 +253,7 @@ export class Engine implements IEngine {
         },
         keyDown: (e) => {
             //console.log('keyDown [e]:', { e });
-            switch (this.getKeyCode(e)) {            
+            switch (this.helpers.getKeyCode(e)) {            
                 case 37: this.player.config.moveX = 1; break; //Left
                 case 38: this.player.config.moveY = 1; break; //Up
                 case 39: this.player.config.moveX = 2; break; //Right
@@ -295,7 +363,7 @@ export class Engine implements IEngine {
                 if (shot.x < window.innerWidth + shot.width) {
                     shot.position.set(shot.x + this.player.config.shot.speed, shot.y);
                     (this.enemies.stage.children as Sprite[])?.forEach?.( enemyShip => {
-                        if (this.intersectionR2R(shot, {
+                        if (this.helpers.intersectionR2R(shot, {
                             x: enemyShip.x,
                             y: enemyShip.y - enemyShip.height,
                             width: enemyShip.width,
@@ -411,7 +479,16 @@ export class Engine implements IEngine {
         stage: new Container(),
         shotStage: new Container(),
         fireTimers: [],
-        createEnemyShip: (x, y, size) => this.player.createSpaceShip(orientations.left, textureNames.spaceAirCraft, x, y, size),
+        createEnemyShip: (x = this.player.wh().width, y = 0, size = 60, orientation = orientations.left, name = textureNames.spaceAirCraft) => {
+            const spriteShip = this.create.sprite(this.textures[name]);
+            spriteShip.x = x;
+            spriteShip.y = y;
+            spriteShip.width = size;
+            spriteShip.height = size;
+            spriteShip.angle = orientation === orientations.right ? 90 : -90;
+
+            return spriteShip;
+        },
         createEnemyShot: () => this.player.createShot(textureNames.shotOrange),
         respawnEnemies: () => {
             const { width, height } = this.player.wh();
@@ -420,8 +497,8 @@ export class Engine implements IEngine {
             for (let i = 0; i < newEnemyCount; i++) {
                 const enemyShip = this.enemies.createEnemyShip();
                 const newX = width - enemyShip.width;
-                let newY = this.randomInt(height - enemyShip.height);
-                while ((this.enemies.stage.children as Sprite[]).find(ship => this.intersectionR2R({
+                let newY = this.helpers.randomInt(height - enemyShip.height);
+                while ((this.enemies.stage.children as Sprite[]).find(ship => this.helpers.intersectionR2R({
                         x: ship.x,
                         y: ship.y - ship.height,
                         width: ship.width,
@@ -432,7 +509,7 @@ export class Engine implements IEngine {
                         width: enemyShip.width,
                         height: enemyShip.height
                     }))) {
-                    newY = this.randomInt(height - enemyShip.height);
+                    newY = this.helpers.randomInt(height - enemyShip.height);
                 }
                 enemyShip.position.set(newX, newY + enemyShip.height);
                 this.enemies.stage.addChild(enemyShip);
@@ -495,8 +572,8 @@ export class Engine implements IEngine {
             delEnemies.forEach(enemy => this.enemies.stage.removeChild(enemy));
             //
             (this.enemies.shotStage.children as Sprite[]).forEach(shot => {
-                const crashShot = (this.player.shotStage.children as Sprite[]).find(shotPlayer => this.intersectionR2R(shot, shotPlayer));
-                if (this.intersectionR2R({
+                const crashShot = (this.player.shotStage.children as Sprite[]).find(shotPlayer => this.helpers.intersectionR2R(shot, shotPlayer));
+                if (this.helpers.intersectionR2R({
                     x: PlayerShip.x - PlayerShip.width,
                     y: PlayerShip.y,
                     width: PlayerShip.width,
@@ -532,50 +609,20 @@ export class Engine implements IEngine {
         }
     };
 
-    randomInt = (int: number) => Math.floor(Math.random() * int);
-    intersectionR2R = (_r1: Rectangles, _r2: Rectangles) => {
-        const r1 = {
-            left: _r1.x,
-            top: _r1.y,
-            right: _r1.x + _r1.width,
-            bottom: _r1.y + _r1.height
-        };
-        const r2 = {
-            left: _r2.x,
-            top: _r2.y,
-            right: _r2.x + _r2.width,
-            bottom: _r2.y + _r2.height
-        };
-
-        if (
-            (
-                (r1.top <= r2.bottom && r1.top >= r2.top) || 
-                (r1.bottom >= r2.top && r1.bottom <= r2.bottom)
-            ) &&
-            (
-                (r1.right >= r2.left && r1.right <= r2.right) ||
-                (r1.left <= r2.right && r1.left >= r2.left)
-            )
-        ) {
-            return true;
+    explosions: ExplosionsTools = {
+        stage: new Container(),
+        createExplosion: () => {
+            //создать взрыв
+        },
+        ticker: () => {
+            // перебирать элементы и анимировать
+        },
+        go: () => {
+            this.addToStage(this.explosions.stage);
+            this.addTicker(this.explosions.ticker);
         }
+    };
 
-        return false;
-    }
-    getKeyCode = (e: KeyboardEvent) => {
-        let key = 0;
-        switch (e.key) {
-            case "ArrowLeft": key = 37; break;
-            case "ArrowUp": key = 38; break;
-            case "ArrowRight": key = 39; break;
-            case "ArrowDown": key = 40; break;
-            case "w":
-            case "W": key = 87; break;
-            default: break;
-        }
-
-        return key;
-    }
     clearCanvas(background = 0x000000) {
         const rectClear = new Graphics();
         rectClear.beginFill(background);
@@ -584,28 +631,17 @@ export class Engine implements IEngine {
         
         this.stage.addChild(rectClear);
     }
-    pause = (pause?: boolean) => {
-        if (pause === undefined) {
-            this.pauseGame = !this.pauseGame;
-        } else {
-            this.pauseGame = !!pause;
-        }
-    };
-    cWidth = () => this.renderer.view.width;
-    cHeight = () => this.renderer.view.height;
-
-    wait = (ms: number = 50) => new Promise(resolve => setTimeout(resolve, ms));
-    waitPause = async () => {
-        while (this.pauseGame) { await this.wait() }
-    };
 
     addToStage = (item: Container | Graphics) => this.stage.addChild(item);
     addTicker = (ticker: TickerCallback<ICanvas>) => this.ticker.add(ticker);
-    loadAssets = async (assets: AssetsList) => {
+
+    loadAssets = async (assets?: AssetsList) => {
+        if (!assets) return;
         await assets.forEach(async ([ name, url ]) => {
             Assets.add(name, url);
             this.textures[name] = await Assets.load(name);
         });
+        this.texturesRady = true;
     }
 
     initialize = async (hasResize?: boolean) => {
@@ -613,6 +649,10 @@ export class Engine implements IEngine {
         if (hasResize) {
             document.body.onresize = () => this.renderer.resize(window.innerWidth, window.innerHeight);
         }
+        this.renderStage.addChild(this.stage);
+        this.renderStage.addChild(this.dialogStage);
+        this.ticker.add(() => this.renderer.render(this.renderStage));
+        this.init = true;
     }
 
     constructor({ width, height, background, hasResize, assetsList, cfgs }: PropsEngine) { 
@@ -631,16 +671,7 @@ export class Engine implements IEngine {
         this.dialogStage = this.create.stage();
         this.ticker = Ticker.shared;
         this.renderer = autoDetectRenderer({ width, height, background });
-        if (assetsList) {
-            this.loadAssets(assetsList).then(() => {
-                this.texturesRady = true;
-            });
-        }
-        this.initialize(hasResize).then(() => {
-            this.renderStage.addChild(this.stage);
-            this.renderStage.addChild(this.dialogStage);
-            this.ticker.add(() => this.renderer.render(this.renderStage));
-            this.init = true;
-        });  
+        this.loadAssets(assetsList);
+        this.initialize(hasResize);  
     }
 }

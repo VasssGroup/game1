@@ -44,14 +44,14 @@ export class Game {
 
     #waitEngineInit = async () => {
         while (!this.e.init) {
-            await this.e.wait();
+            await this.e.helpers.wait();
             //console.log('Engine NOT INITIALISATION !!');
         }
     }
 
     #waitTexturesReady = async () => {
         while (!this.e.texturesRady) {
-            await this.e.wait();
+            await this.e.helpers.wait();
             //console.log('Textures NOT READY !!');
         }
     }
@@ -69,6 +69,12 @@ export class Game {
         //
         this.e.enemies.go();
         console.log('Enemies complite...');
+        //
+        this.e.explosions.go();
+        console.log('Explosions complite...');
+        //
+        this.e.dialog.go();
+        console.log('Explosions complite...');        
     }
 
     constructor(props) {
